@@ -12,7 +12,9 @@
 #include <rdma/rdma_cma.h>
 
 
-int write_data(uint64_t* keys_values);
+//int write_data(uint64_t* keys_values);
+//void write_data(int pos, uint64_t hash, uint64_t value);
+int write_data(int pos, uint64_t hash, uint64_t value);
 void hello();
 void poll_cq(int num);
 int connect_ep();

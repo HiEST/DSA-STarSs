@@ -10,9 +10,14 @@
 #include <string.h>
 #include <infiniband/verbs.h>
 #include <rdma/rdma_cma.h>
+#include <inttypes.h>
 
 #include <omp.h>
+#include "interface.h"
+#include "main_interface.h"
 #include "user_mmap.h"
+
+
 
 
 void	*my_ioaddr_m;
@@ -24,6 +29,37 @@ char buffer_m[40960];
 size_t area_size_m = sizeof buffer_m;
 
 struct ibv_cq		*my_cq_m = NULL;
+
+
+
+//#################################################################################//
+void InsertKV(uint64_t key, uint64_t value)
+{
+
+	printf("****InsertKV Function****\n");
+
+	//insert_interface((const void*) key, (const void*) value);	
+
+	insert_interface(key, value);	
+
+}
+
+void RetrieveKV()
+{
+
+}
+
+void IterateKV()
+{
+	iterate_interface();
+
+}
+
+
+
+
+
+//#################################################################################//
 
 int main(int argc, char *argv[])
 {
@@ -77,22 +113,34 @@ char *filename = argv[1];
 	}*/
 	//post_some_work();
 	//******************************************//
-	const int NUM_KV = 1;
-	const int SIZE = 2;
+	//const int NUM_KV = 1;
+	//const int SIZE = 2;
 	//uint64_t key[SIZE];
 	//uint64_t value[SIZE];
 	
-	uint64_t keys_values[SIZE];
 
+	uint64_t num;
+	uint64_t key;
+	uint64_t value;
+
+	key = 20;
+	value = 20;
 	
-	for (i=0; i<NUM_KV; i++)
-	{
-	for (j=0; j<SIZE; j++)
-	{
-		keys_values[j] = 3;
-	}
+	/* add code to seed random number generator */
+	num = rand();
+	num = (num << 32) | rand();
+	// enforce limits of value between 100000000 and 999999999
+	num = (num % (999999999 - 100000000)) + 100000000;
+	printf("KEY: %" PRIu64 "\n", num);
 
-	write_data(&keys_values);
+	key = num;
+	value = num;
+
+	//printf("KEY: %" PRIu64 "\n", key);
+	//printf("VALUE: %" PRIu64 "\n", value);
+
+
+	/*write_data(&keys_values);
 	}
 	printf("posted...\n");
 	poll_cq(num_wr_m);
@@ -103,6 +151,21 @@ char *filename = argv[1];
 	//	if (buffer_m[i] != 0)
 	//		printf("read back %d at %d\n", buffer_m[i], i);
 
+	*/
+
+	//usage();
+	
+
+	InsertKV(key,value);
+	
+	//RetrieveKV();
+
+	IterateKV();
+
+	
+	//for (i = 0; i < sizeof(buffer_m); i++)
+	//	if (buffer_m[i] != 0)
+	//		printf("read back %d at %d\n", buffer_m[i], i);
 
 
 
