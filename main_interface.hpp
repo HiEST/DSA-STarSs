@@ -12,8 +12,8 @@
 #include <rdma/rdma_cma.h>
 
 #include <omp.h>
-#include "interface.h"
-//#include "main_interface.h"
+#include "interface.hpp"
+#include "common.hpp"
 
 void usage();
 

@@ -11,6 +11,10 @@
 #include <infiniband/verbs.h>
 #include <rdma/rdma_cma.h>
 
+#include <iostream>
+#include <typeinfo>
+#include "common.hpp"
+using namespace std;
 
 //int write_data(uint64_t* keys_values);
 //void write_data(int pos, uint64_t hash, uint64_t value);
@@ -22,4 +26,8 @@ void register_mapping(size_t len);
 int make_context();
 int post_some_work();
 int post_one_read();
-void init_env();
+int post_one_retrieve(uint64_t hash);
+int retrieve_to_check();
+void init_env(void* address);
+
+int post_some_work();

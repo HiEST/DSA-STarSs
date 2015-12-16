@@ -12,11 +12,15 @@
 #include <rdma/rdma_cma.h>
 
 #include <omp.h>
-#include "user_mmap.h"
+#include "user_mmap.hpp"
+#include "common.hpp"
+
 
 uint64_t MurmurHash64( const void * key, int len, unsigned int seed );
 void insert_interface(uint64_t key, uint64_t value);
-void retrieve_interface(const void* key);
+void retrieve_interface(uint64_t key);
+void collapse_positions();
+//void retrieve_interface(const void* key);
 void iterate_interface();
 //void iterate();
 

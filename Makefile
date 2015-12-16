@@ -1,9 +1,9 @@
 #VPATH = perfsnap/src
-#CC=gcc 
+CC=g++ 
 
 
-CC=mcc
-OMPSS_FLAGS = --ompss
+#CC=mcxx
+#OMPSS_FLAGS = --ompss
 EXTRA = -Wno-write-strings
 
 AVAIV_64_FUNC = -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
@@ -31,16 +31,16 @@ $(TESTCASES): main_interface.o interface.o user_mmap.o
 	$(CC) $(CFLAGS) $(OMPSS_FLAGS) $(AVAIV_64_FUNC) $(EXTRA) -o $(TESTCASES) main_interface.o interface.o user_mmap.o -L$(OFED_DIR)/lib -libverbs -lrdmacm
 	#$(CC) $(CFLAGS) -o $(TESTCASES) -L$(OFED_DIR)/lib -libverbs -lrdmacm
 
-main_interface.o: main_interface.c main_interface.h interface.h user_mmap.h
-	$(CC) $(CFLAGS) -c main_interface.c
+main_interface.o: main_interface.cpp main_interface.hpp interface.hpp user_mmap.hpp
+	$(CC) $(CFLAGS) $(OMPSS_FLAGS) $(AVAIV_64_FUNC) $(EXTRA) -c main_interface.cpp
 
 
-interface.o: interface.c interface.h user_mmap.h
-	$(CC) $(CFLAGS) -c interface.c
+interface.o: interface.cpp interface.hpp user_mmap.hpp
+	$(CC) $(CFLAGS) $(OMPSS_FLAGS) $(AVAIV_64_FUNC) $(EXTRA) -c interface.cpp
 
 
-user_mmap.o: user_mmap.c user_mmap.h
-	$(CC) $(CFLAGS) -c user_mmap.c
+user_mmap.o: user_mmap.cpp user_mmap.hpp
+	$(CC) $(CFLAGS) $(OMPSS_FLAGS) $(AVAIV_64_FUNC) $(EXTRA) -c user_mmap.cpp
 
 
 clean:

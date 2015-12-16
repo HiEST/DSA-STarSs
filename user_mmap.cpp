@@ -11,8 +11,13 @@
 #include <infiniband/verbs.h>
 #include <rdma/rdma_cma.h>
 #include <inttypes.h>
+#include <iostream>
+#include <typeinfo>
+#include <fstream>
 
-#include "user_mmap.h"
+#include "user_mmap.hpp"
+
+using namespace std;
 
 struct ibv_context	*my_dsa_context;
 struct ibv_pd		*my_pd;
@@ -28,17 +33,45 @@ struct ibv_comp_channel	*my_wc_channel = NULL;
  
 
 
-void	*my_ioaddr;
+/*void	*my_ioaddr;
 
 int num_wr = 1;
-size_t len_to_post = 40000;
+//size_t len_to_post = 40000;
 
-char buffer[40960];
+//size_t len_to_post = 40000;
+
+//size_t len_to_post = 1000;
+
+//size_t len_to_post = 1000;
+//size_t len_to_post = 10;
+size_t len_to_post = 2;
+
+//char buffer[40960];
+uint64_t buffer[NUM_BUCKET];
+//uint64_t buffer[1000];
+//uint64_t buffer[40960];
 uint64_t bufferLocal[2];
 
 size_t area_size = sizeof buffer; 
 
-const int NUM_KV = 100;
+const int NUM_KV = 100;*/
+
+
+//**********************************************************************************//
+
+void	*my_ioaddr;
+
+//int num_wr = 100;
+int num_wr = 2;
+//size_t len_to_post = 40000;
+size_t len_to_post = 16;
+
+uint64_t buffer[NUM_BUCKET];
+//char buffer[40960];
+//uint64_t buffer[40960];
+size_t area_size = sizeof buffer; 
+
+//**********************************************************************************//
 
 void poll_cq(int num)
 {
@@ -48,8 +81,10 @@ void poll_cq(int num)
 	int polled = 0;
 	int rv;
 
+	cout << "poll function" << endl;
+
 wait_again:
-	printf("poll_cq: wait for event\n");
+	//printf("poll_cq: wait for event\n");
 	rv = ibv_get_cq_event(my_wc_channel, &cq, &ctx);
 	if (rv < 0) {
 		perror("ibv_get_cq_event");
@@ -59,11 +94,11 @@ wait_again:
 poll_again:
 	rv = ibv_poll_cq(cq, 1, &wc);
 	if (rv > 0) {
-		printf("work completion for QP[%d], id %lu, status %d\n",
-			wc.qp_num, wc.wr_id, wc.status); 
+		//printf("work completion for QP[%d], id %lu, status %d\n",
+			//wc.qp_num, wc.wr_id, wc.status); 
 		if (++polled < num)
 			goto poll_again;
-		printf("work completion polling: done\n");
+		//printf("work completion polling: done\n");
 		ibv_req_notify_cq(cq, 0);
 		return;
 	}
@@ -136,21 +171,21 @@ int connect_ep()
 	return 0;
 }
 
-void register_mapping(size_t len)
+void register_mapping(size_t area_size)
 {
 	if (!my_dsa_context) {
 		printf("no dsa device openend\n");
 		return;
 	}
-	my_io_mr = ibv_reg_mr(my_pd, my_ioaddr, len,
+	my_io_mr = ibv_reg_mr(my_pd, my_ioaddr, area_size,
 			      IBV_ACCESS_LOCAL_WRITE|IBV_ACCESS_REMOTE_WRITE|
 			      IBV_ACCESS_REMOTE_READ);
 	if (!my_io_mr) {
 		perror("ibv_reg_mr:");
 		return;
 	}
-	printf("MR openend, lkey %x (%d), rkey%x\n", my_io_mr->lkey, 
-		my_io_mr->lkey >> 8, my_io_mr->rkey);
+	printf("MR openend, lkey %x (%d), rkey%x, area_size: %lu\n", my_io_mr->lkey, 
+		my_io_mr->lkey >> 8, my_io_mr->rkey,area_size);
 }
 
 int make_context(void)
@@ -191,16 +226,21 @@ int make_context(void)
 }
 
 
+
+
+//########################################################################################################
+
 int post_some_work()
 {
 	struct ibv_send_wr wr, *bad_wr = NULL;
 	struct ibv_sge	sge[4];
+	//struct ibv_sge	sge[1];
 	uint64_t remote_addr = (uint64_t)my_ioaddr;
 	int bytes = 0, i = 0;
 	struct ibv_mr *my_small_mr;
-	long int value[1] = { 5 };
+	long int value[1] = { 4 };
 
-	memset(buffer, 2, sizeof(buffer));
+	memset(buffer, 0, sizeof(buffer));
 	/*
 	 * register that local buffer
 	 */
@@ -268,36 +308,56 @@ int post_some_work()
 	return 0;
 }
 
-
 //########################################################################################################
+
 int write_data(int pos, uint64_t hash, uint64_t value2)
 {
 	struct ibv_send_wr wr, *bad_wr = NULL;
-	struct ibv_sge	sge[4];
+	struct ibv_sge	sge[1];
 	uint64_t remote_addr = (uint64_t)my_ioaddr;
 	int bytes = 0, i = 0;
 	struct ibv_mr *my_small_mr;
 	long int value[2] = { 5, 10 };
 
 	//memset(buffer, 0, sizeof(buffer));
-	buffer[0] = hash;
-	buffer[1] = value2;
+
+	//if (hash == 250000 || hash == 50000)
+	//	cout << "hash: "<< hash << "--> value:" << value2 << "--> position:" << pos <<endl;
+
+	//cout << "Keys to insert:" << hash << " ---> position: " << pos*2 << endl;
+
+	buffer[pos*2] = hash;
+	buffer[pos*2+1] = value2;
+
+
+
+	//buffer[0] = hash;
+	//buffer[1] = value2;
+
+	
+	//buffer[0] = 4;
+	//buffer[1] = 5;
+	
+
 	/*
 	 * register that local buffer
 	 */
-	my_host_mr = ibv_reg_mr(my_pd, buffer, sizeof buffer,
+	/*my_host_mr = ibv_reg_mr(my_pd, buffer, sizeof buffer,
 				IBV_ACCESS_LOCAL_WRITE);
 	if (!my_host_mr) {
 		perror("ibv_reg_mr:");
 		return -1;
 	}
-	my_small_mr = ibv_reg_mr(my_pd, &value, sizeof value,
-				 IBV_ACCESS_LOCAL_WRITE);
-	if (!my_small_mr) {
-		perror("ibv_reg_mr:");
-		return -1;
-	}
-	while (i++ < num_wr) {
+	*/
+	/*if (retrieve_to_check() == pos )
+	{
+		cout << "Collapse in position: " << pos << endl;		
+		//return;
+	}*/	
+
+	//cout << "Just before while loop" << endl;		
+
+	//while (i++ < num_wr) {
 		int len = len_to_post;
 		//int len = 16;
 		uint64_t end_of_area = (uint64_t)my_ioaddr + area_size;
@@ -345,163 +405,20 @@ int write_data(int pos, uint64_t hash, uint64_t value2)
 			perror("post send");
 			return -1;
 		}
-		printf("%d: called post_send with [%u] bytes, raddr %p\n",
-			i, sge[0].length, (void *)remote_addr);
+		//printf("%d: called post_send with [%u] bytes, raddr %p\n",
+			//i, sge[0].length, (void *)remote_addr);
 		remote_addr += len;
-	}
-	printf("finished post_send WRITE with %d bytes pushed\n",
-		bytes);
+	//}
+
+	//cout << "after while loop" << endl;
+	//printf("finished post_send WRITE with %d bytes pushed\n",
+		//bytes);
 	return 0;
 }
 
-//#######################################################################################################
-/*void write_data(int pos, uint64_t hash, uint64_t value)
-{
 
-	printf("****write data function 1****\n");
-	struct ibv_send_wr wr, *bad_wr = NULL;
-	//struct ibv_sge	sge[4];
-
-	struct ibv_sge	sge[1];
-
-	uint64_t remote_addr = (uint64_t)my_ioaddr;
-	int bytes = 0, i = pos;
-
-	// Buffer containing the hash_of_the_key and its associate value
-	printf("****write data function 2****\n");
-	//uint64_t bufferLocal[2];
-	//char bufferLocal[2];
-	bufferLocal[0] = hash;
-	bufferLocal[1] = value;
-
-	//memset(bufferLocal, 2, sizeof(bufferLocal));
-
-	printf("Buffer[0] = %d\n", bufferLocal[0]);
-	printf("Buffer[1] = %d\n", bufferLocal[1]);
-
-	//struct ibv_mr *my_small_mr;
-	long int value_m[1] = { 5 };
-
-	//memset(buffer, 2, sizeof(buffer));
-	/*
-	 * register that local buffer
-	 
-	printf("****write data function 2.1****\n");
-	my_host_mr = ibv_reg_mr(my_pd, &bufferLocal, sizeof bufferLocal,
-				IBV_ACCESS_LOCAL_WRITE);
-
-	//my_host_mr = ibv_reg_mr(my_pd, &value_m, sizeof value_m,
-	//			IBV_ACCESS_LOCAL_WRITE);
-
-
-	printf("****write data function 2.2****\n");
-
-	if (!my_host_mr) {
-		perror("ibv_reg_mr:");
-		//return -1;
-	}
-
-	printf("****write data function 3****\n");
-	sge[0].addr = &bufferLocal;
-	printf("sge_add = %d\n", sge[0].addr);
-	
-	sge[0].length = 16;
-	printf("sge_len = %d\n", sge[0].length);
-	
-	sge[0].lkey = my_host_mr->lkey;
-	printf("sge_lkey = %d\n", sge[0].lkey);
-
-
-	wr.wr_id = 12;
-	wr.opcode = IBV_WR_RDMA_WRITE;
-	wr.sg_list = sge;
-	wr.num_sge = 1;
-	wr.send_flags = IBV_SEND_SIGNALED;
-	//wr.wr.rdma.remote_addr = 16;
-	wr.wr.rdma.remote_addr = remote_addr;
-	wr.wr.rdma.rkey = my_io_mr->rkey;
-	wr.next = NULL;
-
-
-	printf("****write data function 4****\n");
-
-		if (ibv_post_send(my_id->qp, &wr, &bad_wr)) {
-			perror("post send");
-			//return -1;
-		}
-		//printf("%d: called post_send with [%u][%u] bytes, raddr %p\n",
-		//	i, sge[0].length, sge[1].length, (void *)remote_addr);
-	//remote_addr += len;
-	//}
-
-	printf("****write data function 5****\n"); 	
-		
-	printf("finished post_send WRITE with %d bytes pushed\n",
-		sge[0].length);
-
-
-
-	//my_small_mr = ibv_reg_mr(my_pd, &value, sizeof value,
-	//			 IBV_ACCESS_LOCAL_WRITE);
-	//if (!my_small_mr) {
-	//	perror("ibv_reg_mr:");
-	//	return -1;
-	//}
-	//while (i++ < num_wr) {
-		/*int len = len_to_post;
-		uint64_t end_of_area = (uint64_t)my_ioaddr + area_size;
-		uint64_t remote_end = (uint64_t)remote_addr + (uint64_t)len;
-
-		if (remote_end  > end_of_area)
-			remote_addr = (uint64_t)my_ioaddr;
-
-		sge[0].addr = (uint64_t)&value;
-		sge[0].length = sizeof value;
-		sge[0].lkey = my_small_mr->lkey;
-
-		/* Test intermediate null length SGE 
-		sge[2].addr = (uint64_t)&value;
-		sge[2].length = 0;
-		sge[2].lkey = my_small_mr->lkey;
-
-		sge[3].addr = (uint64_t)&value;
-		sge[3].length = sizeof value;
-		sge[3].lkey = my_small_mr->lkey;
-
-		len -= sge[0].length + sge[2].length + sge[3].length;
-		if (len < 0)
-			len = 0;
-		sge[1].addr = (uint64_t)buffer;
-		sge[1].length = len;
-		sge[1].lkey = my_host_mr->lkey;
-		
-		wr.wr_id = i;
-		wr.opcode = IBV_WR_RDMA_WRITE;
-		wr.sg_list = sge;
-		wr.num_sge = 4;
-		wr.send_flags = IBV_SEND_SIGNALED;
-		wr.wr.rdma.remote_addr = remote_addr;
-		wr.wr.rdma.rkey = my_io_mr->rkey;
-		wr.next = NULL;
-
-		bytes += sge[0].length + sge[1].length;
-
-		if (ibv_post_send(my_id->qp, &wr, &bad_wr)) {
-			perror("post send");
-			return -1;
-		}
-		printf("%d: called post_send with [%u][%u] bytes, raddr %p\n",
-			i, sge[0].length, sge[1].length, (void *)remote_addr);
-		remote_addr += len;
-	//}
-	printf("finished post_send WRITE with %d bytes pushed\n",
-		bytes);
-	return 0;
-}*/
 
 //########################################################################################################
-
-
 
 
 int post_one_read()
@@ -515,9 +432,83 @@ int post_one_read()
 
 	//uint64_t bufferLocal2[2] = {0,0};
 	//char buffer2[40960];
-	memset(buffer, 0, sizeof(buffer));
-	buffer[3] = 30;
+	//memset(buffer, 0, sizeof(buffer));
+	//buffer[3] = 30; //in virtual memory not the device
 
+	sge[0].addr = (uint64_t)buffer;
+	//sge[0].length = len_to_post;
+	sge[0].length = len_to_post;
+	//sge[0].length = 1;
+	sge[0].lkey = my_host_mr->lkey;
+	wr.wr_id = 12;
+	wr.opcode = IBV_WR_RDMA_READ;
+	wr.sg_list = sge;
+	wr.num_sge = 1;
+	wr.send_flags = IBV_SEND_SIGNALED;
+	wr.wr.rdma.remote_addr = (uint64_t)my_ioaddr;
+	wr.wr.rdma.rkey = my_io_mr->rkey;
+	wr.next = NULL;
+
+	if (ibv_post_send(my_id->qp, &wr, &bad_wr)) {
+		perror("post send read");
+		return -1;
+	}
+
+	//printf ("Size of buffer %d\n", sizeof(buffer));
+	//for ( i = 0; i < sizeof(buffer); i++) // car char is one byte so it's fine till sizeof buffer
+	for ( i = 0; i < NUM_BUCKET; i=i+2)
+	{
+                //if (buffer[i] != 0)
+                        //printf("read back %c at %d\n", buffer[i], i);
+                    	//cout << "read back " << uint64_t(buffer[i]) << " ---> type " << typeid(buffer[i]).name() << endl;
+                    	//cout << "read back " << int(buffer[i]) << " ---> type " << typeid(buffer[i]).name() << endl;
+                    	//cout << "read back " << buffer[i] << " ---> type " << typeid(buffer[i]).name() << endl;
+                    	//cout << "read back key: " << buffer[i] << " at position: "<< i << endl;
+                    	//cout << "read back value: " << buffer[i+1] << " at position: "<< i+1 << endl;
+                    	//cout << "read back value: " << buffer[i+1] << " at position: "<< i << endl;
+                    	//cout << "read back " << uint64_t(buffer[i]) << " ---> type " << typeid(buffer[i]).name() << "--"<<typeid(uint64_t(buffer[i])).name() << endl;
+
+			/*if (i%2 == 0)
+				cout << "read back key: " << buffer[i] << " at position: "<< i << endl;
+			else
+				cout << "read back value: " << buffer[i] << " at position: "<< i << endl;	
+			*/
+
+			
+				cout << "key: " << buffer[i] << " -- > value: "<< buffer[i+1] << endl;
+			
+			
+	}
+
+	/*int num_keys=0;
+	for ( i = 0; i < 1000; i++)
+    {  
+                if (buffer[i] != 0)
+                	num_keys++;              
+    }
+    cout << "Number of keys: " << num_keys << endl;*/
+
+	return 0;
+}
+
+//########################################################################################################
+
+
+int post_one_retrieve(uint64_t hash)
+{
+	struct ibv_send_wr wr, *bad_wr = NULL;
+	struct ibv_sge	sge[1];
+	
+	//memset(buffer, 0, sizeof(buffer));
+	//printf("read back bufferLocal 0 : %d\n", bufferLocal[0]);
+	//printf("read back bufferLocal 1 : %d\n", bufferLocal[1]);
+
+	//uint64_t bufferLocal2[2] = {0,0};
+	//char buffer2[40960];
+	//memset(buffer, 0, sizeof(buffer));
+	//buffer[3] = 30; //in virtual memory not the device
+
+	//cout << "hash in retrieve :" << hash << endl;
 	sge[0].addr = (uint64_t)buffer;
 	sge[0].length = len_to_post;
 	//sge[0].length = 1;
@@ -536,20 +527,95 @@ int post_one_read()
 		return -1;
 	}
 
-	printf ("Size of buffer %d\n", sizeof(buffer));
-	for ( i = 0; i < sizeof(buffer); i++) // car char is one byte so it's fine till sizeof buffer
-                if (buffer[i] != 0)
-                        printf("read back %d at %d\n", buffer[i], i);
+	//printf ("Size of buffer %d\n", sizeof(buffer));
+	//for ( i = 0; i < sizeof(buffer); i++) // car char is one byte so it's fine till sizeof buffer
+	int i=0;
+	//for ( i = 0; i < 1000; i++)
+	int index = hash*2;
+	if (buffer[index] == hash)	
+                {
+                        
+                	
+                	//cout << "hash: " << buffer[index] << " at position: "<< index << endl;
+                	cout << "key: " << buffer[index] << " -- > value: "<< buffer[index+1] << endl;
+                	//cout << "value: " << buffer[i+1] << " at position: "<< i+1 << endl;
+                    //break;	
+                }  
+                //i++; 
 
+
+	/*while (i < NUM_BUCKET)	
+    {  
+                //if (buffer[i] != 0 &&  buffer[i] == hash)
+                if (buffer[i] == hash)	
+                {
+                        
+                	
+                	//cout << "hash: " << buffer[i] << " at position: "<< i << endl;
+                	//cout << "value: " << buffer[i+1] << " at position: "<< i+1 << endl;
+                    break;	
+                }  
+                i++;
+				
+
+                 	
+    }*/
+    // How many distinct keys inserted
+    	
 	return 0;
 }
+
+
+//########################################################################################################
+
+int retrieve_to_check()
+{
+	struct ibv_send_wr wr, *bad_wr = NULL;
+	struct ibv_sge	sge[1];
+	
+	
+	sge[0].addr = (uint64_t)buffer;
+	sge[0].length = len_to_post;
+	//sge[0].length = 1;
+	sge[0].lkey = my_host_mr->lkey;
+	wr.wr_id = 12;
+	wr.opcode = IBV_WR_RDMA_READ;
+	wr.sg_list = sge;
+	wr.num_sge = 1;
+	wr.send_flags = IBV_SEND_SIGNALED;
+	wr.wr.rdma.remote_addr = (uint64_t)my_ioaddr;
+	wr.wr.rdma.rkey = my_io_mr->rkey;
+	wr.next = NULL;
+
+	if (ibv_post_send(my_id->qp, &wr, &bad_wr)) {
+		perror("post send read");
+		//return -1;
+	}
+
+	
+	int i=0;
+	while (i < 1000)	
+    {  
+                if (buffer[i] != 0)
+                {
+                        
+                	return i;
+                    break;	
+                }  
+                i++;  	
+    }
+    
+}
+
 
 void init_env(void* my_ioaddr_m)
 {
 	my_ioaddr = my_ioaddr_m;
+	memset(buffer, 0, sizeof(buffer));
 	if (make_context())
 		exit(1);
 		//return 0;
+	cout << "area_size : " << area_size << endl;
 	register_mapping(area_size);
 	sleep(1);
 	if (connect_ep())
@@ -562,100 +628,17 @@ void init_env(void* my_ioaddr_m)
 		exit(1);
 		//return 0;
 	}
-}
 
-/*int write_data(uint64_t* keys_values)
-{
-	struct ibv_send_wr wr, *bad_wr = NULL;
-	//struct ibv_sge	sge[4];
-	struct ibv_sge	sge[1];
-	uint64_t remote_addr = (uint64_t)my_ioaddr;
-	int bytes = 0, i = 0, k;
-	struct ibv_mr *my_small_mr;
-	long int value[1] = { 4 };
-
-	printf("***0*** : %d\n", keys_values[0]);
-	printf("***1*** : %d\n", keys_values[1]);
-	
-	memset(buffer, 0, sizeof(buffer));
-	for(k=0; k<2; k++)
-		buffer[k] = keys_values[k];
-
-	/*
-	 * register that local buffer
-	 
+	printf("Registering the host address\n");
 	my_host_mr = ibv_reg_mr(my_pd, buffer, sizeof buffer,
 				IBV_ACCESS_LOCAL_WRITE);
 	if (!my_host_mr) {
 		perror("ibv_reg_mr:");
-		return -1;
+		//return -1;
 	}
+}
 
-	my_small_mr = ibv_reg_mr(my_pd, &value, sizeof value,
-				 IBV_ACCESS_LOCAL_WRITE);
-	if (!my_small_mr) {
-		perror("ibv_reg_mr:");
-		return -1;
-	}
-	while (i++ < num_wr) {
-		int len = len_to_post;
-		uint64_t end_of_area = (uint64_t)my_ioaddr + area_size;
-		uint64_t remote_end = (uint64_t)remote_addr + (uint64_t)len;
 
-		if (remote_end  > end_of_area)
-			remote_addr = (uint64_t)my_ioaddr;
-
-		//sge[0].addr = (uint64_t)&value;
-		//sge[0].length = 0;
-		//sge[0].lkey = my_small_mr->lkey;
-
-		/* Test intermediate null length SGE 
-		//sge[2].addr = (uint64_t)&value;
-		//sge[2].length = 0;
-		//sge[2].lkey = my_small_mr->lkey;
-
-		//sge[3].addr = (uint64_t)&value;
-		//sge[3].length = 0;
-		//sge[3].lkey = my_small_mr->lkey;
-
-		//len -= sge[0].length + sge[2].length + sge[3].length;
-		if (len < 0)
-			len = 0;
-		//sge[1].addr = (uint64_t)buffer;
-		//sge[1].length = len;
-		//sge[1].lkey = my_host_mr->lkey;
-	
-			
-		sge[0].addr = (uint64_t)buffer;
-		sge[0].length = len;
-		sge[0].lkey = my_host_mr->lkey;
-		
-		wr.wr_id = i;
-		wr.opcode = IBV_WR_RDMA_WRITE;
-		wr.sg_list = sge;
-		//wr.num_sge = 4;
-		wr.num_sge = 1;
-		wr.send_flags = IBV_SEND_SIGNALED;
-		wr.wr.rdma.remote_addr = remote_addr;
-		wr.wr.rdma.rkey = my_io_mr->rkey;
-		wr.next = NULL;
-
-		//bytes += sge[0].length + sge[1].length;
-		bytes += sge[0].length;
-
-		if (ibv_post_send(my_id->qp, &wr, &bad_wr)) {
-			perror("post send");
-			return -1;
-		}
-		printf("%d: called post_send with [%u] bytes, raddr %p\n",
-			i, sge[0].length, (void *)remote_addr);
-		remote_addr += len;
-	}
-	printf("finished post_send WRITE with %d bytes pushed\n",
-		bytes);
-	return 0;
-
-}*/
 
 int read_data()
 {
@@ -702,113 +685,4 @@ void hello()
 	printf("hello world");
 }
 
-/* Dummy test for mmapping partition */
-/*int main(int argc, char *argv[])
-{
-	char *filename = argv[1];
-	char *command = NULL;
-	int mode = O_RDWR;
-	int fd, i;
-
-	if (argc < 2)
-		return 0;
-
-	command = argv[2];
-
-	if (command)
-		len_to_post = strtod(command, NULL);
-
-	fd = open(filename, mode);
-	if (fd < 0) {
-		perror("open");
-		return 0;
-	} 
-	printf("%s opened with %d\n", filename, fd);
-
-	my_ioaddr = mmap(NULL, area_size, PROT_NONE, MAP_SHARED, fd, 0);
-	if (my_ioaddr == MAP_FAILED) {
-		perror("mmap failed: ");
-		return 0;
-	} else
-		printf("mmap: got %p\n", my_ioaddr);
-
-	sleep(1);
-#if 0
-	printf("about to write  to%p\n", myaddr);
-
-	sleep(1);
-
-	*myaddr = 42;
-
-	printf("about to read from%p\n", myaddr);
-
-	sleep(1);
-
-	printf("got %d\n", *myaddr);
-#endif
-	if (make_context())
-		return 0;
-	register_mapping(area_size);
-	sleep(1);
-	if (connect_ep())
-		return 0;
-	printf("connected...\n");
-	sleep(1);
-	if (ibv_req_notify_cq(my_cq, 0) != 0) {
-		perror("ibv_req_notify_cq");
-		return 0;
-	}
-	post_some_work();
-	printf("posted...\n");
-	poll_cq(num_wr);
-	//post_one_read();
-	//post_one_read();
-	//post_one_read();
-	//poll_cq(1);
-	
-	printf("Size of buffer %d\n", sizeof(buffer));
-	
-	for (i = 0; i < sizeof(buffer); i++)
-	//for (i = 0; i < 2; i++)
-		if (buffer[i] != 6)
-			printf("read back %d at %d\n", buffer[i], i);
-
-	if (command && !strncmp(command, "unmap", 3)) {
-		printf("about to unmap from%p\n", my_ioaddr);
-
-		sleep(5);
-
-		munmap(my_ioaddr, 42);
-
-		printf("unmapped.....about to close %s\n", filename);
-		
-		sleep(5);
-
-		close(fd);
-
-	} else if (command && !strncmp(command, "wait", 4)) {
-		printf("waiting before close %s\n", filename);
-
-		sleep(600);
-
-		close(fd);
-
-	} else if (command && !strncmp(command, "two", 3)) {
-		void *myaddr2;
-
-		printf("do another mmap %s\n", filename);
-
-		myaddr2 = mmap(NULL, 42, PROT_NONE, MAP_SHARED, fd, 0);
-		if (myaddr2 == MAP_FAILED)
-			perror("another mmap failed: ");
-		else
-			printf("another mmap: got %p\n", myaddr2);
-	} else {
-		sleep(5);
-		close(fd);
-	}
-	printf("closed %s\n", filename);
-
-	return 0;
-}*/
 	
